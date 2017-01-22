@@ -50,8 +50,8 @@ class Grade(object):
 
         payload = {}
         payload["channel"] = self.channel
-        payload["text"] = "@{}: {}".format(self.user, self.remark)
-
+        payload["text"] = "<@{}> : {}".format(self.student, self.remark)
+        payload["link_names"] = 1
         cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
         so = run(cmd)
 
@@ -63,7 +63,7 @@ class Grade(object):
             lf.write("{}\n".format(self.__str__()))
 
     def __str__(self):
-        return "{}: {:20}, {:12}, {}".format(self.date, self.student, self.channel, self.remark)
+        return "{} : {:20}, {:12}, {}".format(self.date, self.student, self.channel, self.remark)
 
 class Record(object):
     """ a recorded grade from our logs """
