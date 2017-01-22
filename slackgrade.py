@@ -3,11 +3,15 @@
 from __future__ import print_function
 
 import argparse
-import configparser
 import datetime
+import json
 import os
+import shlex
+import subprocess
 import sys
 import validators
+
+import configparser
 
 def run(string):
     """ run a UNIX command """
@@ -89,7 +93,7 @@ def main(student=None, remark=None, channel=None,
         g = Grade(student, remark=remark, channel=channel)
 
         # post the +1 to slack
-        #g.slack_post(params)
+        g.slack_post(params)
 
         # update the grade log
         g.update_grades(params)
@@ -100,18 +104,18 @@ def get_args():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--setup", help="define or modify the settings for your class", 
+    parser.add_argument("--setup", help="define or modify the settings for your class",
                         action="store_true")
     parser.add_argument("--report", help="write out a CSV file",
                         action="store_true")
     parser.add_argument("--class_name", type=str, help="name of class to grade",
                         default=None)
-    parser.add_argument("student", type=str, nargs="?", 
+    parser.add_argument("student", type=str, nargs="?",
                         help="name of student to grade",
                         default="")
-    parser.add_argument("comment", type=str, nargs="?", 
+    parser.add_argument("comment", type=str, nargs="?",
                         help="comment to use as grade", default="")
-    parser.add_argument("channel", type=str, nargs="?", 
+    parser.add_argument("channel", type=str, nargs="?",
                         help="channel to post to",
                         default="#general")
     args = parser.parse_args()
