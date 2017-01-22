@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+"""
+this is a simple grading tool for slack.  We post a simple
+"+1"-style grade for a student to a slack channel using an incoming
+webhook.
+"""
+
 from __future__ import print_function
 
 import argparse
@@ -9,9 +15,9 @@ import os
 import shlex
 import subprocess
 import sys
-import validators
 
 import configparser
+import validators
 
 def run(string):
     """ run a UNIX command """
@@ -31,6 +37,7 @@ class Grade(object):
     """ a new grade entry that we will be adding to slack and our records """
 
     def __init__(self, student, remark=None, channel="#general"):
+        """ a Grade keeps track of a single entry in our grade records """
         if student.startswith("@"):
             student = student.split("@")[1]
         self.student = student
@@ -45,7 +52,7 @@ class Grade(object):
         self.date = "{}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def slack_post(self, params):
-
+        """ post our grade to slack """
         webhook = params["web-hook"]
 
         payload = {}
@@ -82,7 +89,7 @@ class Record(object):
 def main(student=None, remark=None, channel=None,
          class_name=None,
          just_summary=False):
-
+    """ the main driver """
     params = get_defaults(class_name)
 
     # if we just want a summary, do it
@@ -100,7 +107,7 @@ def main(student=None, remark=None, channel=None,
 
 
 def report(params):
-    
+    """ generate a simple report of the form 'student, grade' """
     records = []
 
     # open up the log file and create a list of records
@@ -169,10 +176,6 @@ def get_defaults(class_name):
     defaults["grade-log"] = cf.get(class_name, "grade-log")
 
     return defaults
-
-def export_csv():
-    """ export a CSV file containing student and score columns """
-    pass
 
 def log_name(log_path, class_name):
     """ return the name of the log file we'll use """
