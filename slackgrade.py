@@ -9,23 +9,57 @@ import os
 import sys
 import validators
 
+def run(string):
+    """ run a UNIX command """
+
+    # shlex.split will preserve inner quotes
+    prog = shlex.split(string)
+    p0 = subprocess.Popen(prog, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT)
+
+    stdout0, stderr0 = p0.communicate()
+    rc = p0.returncode
+    p0.stdout.close()
+
+    return stdout0, stderr0, rc
+
 class Grade(object):
     """ a new grade entry that we will be adding to slack and our records """
 
     def __init__(self, student, remark=None, channel="#general"):
+        if student.startswith("@"):
+            student = student.split("@")[1]
         self.student = student
+
         self.remark = remark
+
+        if not channel.startswith("#"):
+            channel = "#" + channel
         self.channel = channel
 
         # record the data / time
         self.date = "{}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def slack_post(self, params):
-        pass
+
+        webhook = params["web-hook"]
+
+        payload = {}
+        payload["channel"] = self.channel
+        payload["text"] = "@{}: {}".format(self.user, self.remark)
+
+        cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
+        so = run(cmd)
 
     def update_grades(self, params):
         """ update the grade log """
+        log_file = params["grade-log"]
 
+        with open(log_file, "a") as lf:
+            lf.write("{}\n".format(self.__str__()))
+
+    def __str__(self):
+        return "{}: {:20}, {:12}, {}".format(self.date, self.student, self.channel, self.remark)
 
 class Record(object):
     """ a recorded grade from our logs """
@@ -41,15 +75,11 @@ class Record(object):
         return self.student < other.student
 
 
-
 def main(student=None, remark=None, channel=None,
          class_name=None,
          just_summary=False):
 
     params = get_defaults(class_name)
-
-    print(params)
-    sys.exit()
 
     # if we just want a summary, do it
     if just_summary:
@@ -59,7 +89,7 @@ def main(student=None, remark=None, channel=None,
         g = Grade(student, remark=remark, channel=channel)
 
         # post the +1 to slack
-        g.slack_post(params)
+        #g.slack_post(params)
 
         # update the grade log
         g.update_grades(params)
@@ -156,7 +186,7 @@ def setup_params():
         except IOError:
             sys.exit("Error: unable to create the log file")
         else:
-            lf.write("# slack grade log log for class: {}".format(class_name))
+            lf.write("# slack grade log log for class: {}\n".format(class_name))
             lf.close()
 
     # write defaults file -- it's an ini-style file
