@@ -43,9 +43,13 @@ class Record(object):
 
 
 def main(student=None, remark=None, channel=None,
+         class_name=None,
          just_summary=False):
 
-    params = get_defaults()
+    params = get_defaults(class_name)
+
+    print(params)
+    sys.exit()
 
     # if we just want a summary, do it
     if just_summary:
@@ -70,8 +74,10 @@ def get_args():
                         action="store_true")
     parser.add_argument("--report", help="write out a CSV file",
                         action="store_true")
-    parser.add_argument("user", type=str, nargs="?", 
-                        help="name of user to grade",
+    parser.add_argument("--class_name", type=str, help="name of class to grade",
+                        default=None)
+    parser.add_argument("student", type=str, nargs="?", 
+                        help="name of student to grade",
                         default="")
     parser.add_argument("comment", type=str, nargs="?", 
                         help="comment to use as grade", default="")
@@ -82,17 +88,36 @@ def get_args():
 
     if not args.setup and not args.report:
         # in this case, we require the user name and comment
-        if args.user == "" or args.comment == "":
+        if args.student == "" or args.comment == "":
             parser.print_help()
-            sys.exit("\nuser and comment are required")
+            sys.exit("\nstudent and comment are required")
 
     return args
 
-def get_defaults():
+def get_defaults(class_name):
     """ we store our default settings in a ~/.slackgrader file """
+    home_path = os.getenv("HOME")
+    defaults_file = os.path.join(home_path, ".slackgrader")
+
+    try:
+        cf = configparser.ConfigParser()
+        cf.read(defaults_file)
+    except:
+        sys.exit("Error: unable to read ~/.slackgrader")
+
+    # if no class name was defined, then we use the first
+    if class_name is None:
+        class_name = cf.sections()[0]
+
+    defaults = {}
+    defaults["web-hook"] = cf.get(class_name, "web-hook")
+    defaults["grade-log"] = cf.get(class_name, "grade-log")
+
+    return defaults
 
 def export_csv():
     """ export a CSV file containing student and score columns """
+    pass
 
 def log_name(log_path, class_name):
     """ return the name of the log file we'll use """
@@ -172,4 +197,4 @@ if __name__ == "__main__":
         main(just_summary=True)
 
     else:
-        main(args.student, args.remark, args.channel)
+        main(args.student, args.comment, args.channel, class_name=args.class_name)
