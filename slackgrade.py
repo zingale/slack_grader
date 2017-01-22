@@ -3,9 +3,15 @@
 from __future__ import print_function
 
 import argparse
+import configparser
 import datetime
+import os
+import sys
+import validators
 
 class Grade(object):
+    """ a new grade entry that we will be adding to slack and our records """
+
     def __init__(self, student, remark=None, channel="#general"):
         self.student = student
         self.remark = remark
@@ -15,10 +21,24 @@ class Grade(object):
         self.date = "{}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def slack_post(self, params):
-
+        pass
 
     def update_grades(self, params):
         """ update the grade log """
+
+
+class Record(object):
+    """ a recorded grade from our logs """
+
+    def __init__(self, student, date, remark, channel):
+        self.student = student
+        self.date = date
+        self.remark = remark
+        self.channel = channel
+
+    def __lt__(self, other):
+        """ compare on student name for sorting """
+        return self.student < other.student
 
 
 
@@ -50,24 +70,82 @@ def get_defaults():
 def export_csv():
     """ export a CSV file containing student and score columns """
 
+def log_name(log_path, class_name):
+    """ return the name of the log file we'll use """
+    return os.path.join(log_path, "{}-slackgrades.log".format(class_name.strip()))
+
 def setup_params():
     """ query the user to get the default parameters for this grade session """
 
     # ask for the name of this class
+    class_name = input("Enter the name of the class: ")
+    if class_name == "":
+        sys.exit("Error: class name cannot be empty")
 
-    # ask for the slack api token
+    # ask for the slack api webhook
+    web_hook = input("Enter the full URL for your slack webhook: ")
+    if not validators.url(web_hook):
+        sys.exit("Error: slack webhook does not seem to be a valid URL")
 
     # ask for the path to the grade log
+    home_path = os.getenv("HOME")
 
-    # ask for the name of the "grader" that will make the posts in slack
+    log_path = input("Enter the full path to the grade log [{}]: ".format(home_path))
+    if log_path == "":
+        log_path = home_path
+
+    grade_log = log_name(log_path, class_name)
+
+    if os.path.isfile(grade_log):
+        # if it exists, say we'll append.
+        print("Grade log already exists.  We'll append")
+        print("using logfile: {}".format(grade_log))
+    else:
+        # create a stub
+        try:
+            lf = open(grade_log, "w")
+        except IOError:
+            sys.exit("Error: unable to create the log file")
+        else:
+            lf.write("# slack grade log log for class: {}".format(class_name))
+            lf.close()
+
+    # write defaults file -- it's an ini-style file
+    defaults_file = os.path.join(home_path, ".slackgrader")
+
+    # if it exists, read its contents
+    if os.path.isfile(defaults_file):
+        try:
+            cf = configparser.ConfigParser()
+            cf.read(defaults_file)
+        except:
+            sys.exit("Error: default file exists but is unreadable")
+    else:
+        cf = configparser.ConfigParser({})
+
+    # delete our class section if it is already there
+    cf.remove_section(class_name)
+
+    # now add it to start clean
+    cf.add_section(class_name)
+
+    # add the options
+    cf.set(class_name, "web-hook", web_hook)
+    cf.set(class_name, "grade-log", grade_log)
+
+    # write it out
+    with open(defaults_file, "w") as f:
+        cf.write(f)
 
 
 if __name__ == "__main__":
     args = get_args()
 
-    if args.just_summary:
+    if args.setup:
+        setup_params()
+
+    elif args.just_summary:
         main(just_summary=True)
+
     else:
-
-    main(args.student, args.remark, args.channel)
-
+        main(args.student, args.remark, args.channel)
