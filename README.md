@@ -37,7 +37,7 @@ with a message (indicating the grade):
 ./slackgrade.py student comment [channel]
 ```
 
-Each grade is assumed to have the 
+Each grade is assumed to have the same point value.
 
 A record of this is stored in the logfile noted during the setup part
 above.  Each record is given its own line in the log file.  This
