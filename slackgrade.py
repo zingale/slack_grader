@@ -87,7 +87,7 @@ def main(student=None, remark=None, channel=None,
 
     # if we just want a summary, do it
     if just_summary:
-        export_csv()
+        report(params)
     else:
         # create the grade object
         g = Grade(student, remark=remark, channel=channel)
@@ -99,6 +99,27 @@ def main(student=None, remark=None, channel=None,
         g.update_grades(params)
 
 
+def report(params):
+    
+    records = []
+
+    # open up the log file and create a list of records
+    with open(params["grade-log"]) as lf:
+        for line in lf:
+            if line.startswith("#"):
+                continue
+            date, student, channel, remark = line.split(",")
+            records.append(Record(student, date, remark, channel))
+
+    # find unique student names
+    names = sorted(list(set([q.student for q in records])))
+
+    for name in names:
+        points = len([q for q in records if q.student == name])
+        print("{:20}, {}".format(name, points))
+
+
+
 def get_args():
     """ parse commandline arguments """
 
@@ -106,7 +127,7 @@ def get_args():
 
     parser.add_argument("--setup", help="define or modify the settings for your class",
                         action="store_true")
-    parser.add_argument("--report", help="write out a CSV file",
+    parser.add_argument("--report", help="write out a summary of points by student",
                         action="store_true")
     parser.add_argument("--class_name", type=str, help="name of class to grade",
                         default=None)
