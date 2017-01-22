@@ -64,6 +64,30 @@ def main(student=None, remark=None, channel=None,
 def get_args():
     """ parse commandline arguments """
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--setup", help="define or modify the settings for your class", 
+                        action="store_true")
+    parser.add_argument("--report", help="write out a CSV file",
+                        action="store_true")
+    parser.add_argument("user", type=str, nargs="?", 
+                        help="name of user to grade",
+                        default="")
+    parser.add_argument("comment", type=str, nargs="?", 
+                        help="comment to use as grade", default="")
+    parser.add_argument("channel", type=str, nargs="?", 
+                        help="channel to post to",
+                        default="#general")
+    args = parser.parse_args()
+
+    if not args.setup and not args.report:
+        # in this case, we require the user name and comment
+        if args.user == "" or args.comment == "":
+            parser.print_help()
+            sys.exit("\nuser and comment are required")
+
+    return args
+
 def get_defaults():
     """ we store our default settings in a ~/.slackgrader file """
 
@@ -144,7 +168,7 @@ if __name__ == "__main__":
     if args.setup:
         setup_params()
 
-    elif args.just_summary:
+    elif args.report:
         main(just_summary=True)
 
     else:
