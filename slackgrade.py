@@ -63,7 +63,7 @@ class Grade(object):
             lf.write("{}\n".format(self.__str__()))
 
     def __str__(self):
-        return "{} : {:20}, {:12}, {}".format(self.date, self.student, self.channel, self.remark)
+        return "{}, {:20}, {:12}, {}".format(self.date, self.student, self.channel, self.remark)
 
 class Record(object):
     """ a recorded grade from our logs """
