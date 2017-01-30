@@ -113,13 +113,13 @@ def report(params):
     # open up the log file and create a list of records
     with open(params["grade-log"]) as lf:
         for line in lf:
-            if line.startswith("#"):
+            if line.startswith("#") or line.strip() == "":
                 continue
             date, student, channel, remark = line.split(",")
             records.append(Record(student, date, remark, channel))
 
     # find unique student names
-    names = sorted(list(set([q.student for q in records])))
+    names = sorted(set([q.student for q in records]))
 
     for name in names:
         points = len([q for q in records if q.student == name])
