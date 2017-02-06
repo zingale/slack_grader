@@ -85,16 +85,55 @@ class Record(object):
         """ compare on student name for sorting """
         return self.student < other.student
 
+    def __str__(self):
+        rstr = "{}: ({}; {}) {}".format(self.student, self.date, self.channel, self.remark)
+        return rstr
+
+class Student(object):
+    """ a collection of all the records for a particular student """
+    
+    def __init__(self, student):
+        self.student = student
+        self.records = []
+
+    def direct_message(self, params):
+        """send a direct message to the student's slack DM channel
+        summarizing the grades"""
+
+        webhook = params["web-hook"]
+
+        text = """"""
+        for r in self.records:
+            text += "{}\n".format(r)
+
+        print(text)
+        # payload = {}
+        # payload["channel"] = "@{}".format(self.student)
+        # payload["text"] = text
+        # payload["link_names"] = 1
+        # cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
+        # so = run(cmd)
+
 
 def main(student=None, remark=None, channel=None,
-         class_name=None,
-         just_summary=False):
+         class_name=None, just_summary=False, post_grades=False):
     """ the main driver """
+
     params = get_defaults(class_name)
 
     # if we just want a summary, do it
     if just_summary:
         report(params)
+
+    elif post_grades:
+        records = get_records(params)
+        names = set([q.student for q in records])
+
+        for n in names:
+            student = Student(n)
+            student.records = [q for q in records if q.student == n]
+            student.direct_message(params)
+
     else:
         # create the grade object
         g = Grade(student, remark=remark, channel=channel)
@@ -106,8 +145,7 @@ def main(student=None, remark=None, channel=None,
         g.update_grades(params)
 
 
-def report(params):
-    """ generate a simple report of the form 'student, grade' """
+def get_records(params):
     records = []
 
     # open up the log file and create a list of records
@@ -117,6 +155,13 @@ def report(params):
                 continue
             date, student, channel, remark = line.split(",")
             records.append(Record(student, date, remark, channel))
+
+    return records
+
+def report(params):
+    """ generate a simple report of the form 'student, grade' """
+
+    records = get_records(params)
 
     # find unique student names
     names = sorted(set([q.student for q in records]))
@@ -136,6 +181,8 @@ def get_args():
                         action="store_true")
     parser.add_argument("--report", help="write out a summary of points by student",
                         action="store_true")
+    parser.add_argument("--post_grades", help="post grade summaries to the student's DM channel",
+                        action="store_true")
     parser.add_argument("--class_name", type=str, help="name of class to grade",
                         default=None)
     parser.add_argument("student", type=str, nargs="?",
@@ -148,7 +195,7 @@ def get_args():
                         default="#general")
     args = parser.parse_args()
 
-    if not args.setup and not args.report:
+    if not args.setup and not (args.report or args.post_grades):
         # in this case, we require the user name and comment
         if args.student == "" or args.comment == "":
             parser.print_help()
@@ -253,6 +300,9 @@ if __name__ == "__main__":
 
     elif args.report:
         main(just_summary=True)
+
+    elif args.post_grades:
+        main(post_grades=True)
 
     else:
         main(args.student, args.comment, args.channel, class_name=args.class_name)
