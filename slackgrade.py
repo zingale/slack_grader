@@ -103,6 +103,7 @@ class Record(object):
         rstr = "{}: ({}; {}) {}".format(self.student, self.date, self.channel, self.remark)
         return rstr
 
+
 class Student(object):
     """ a collection of all the records for a particular student """
     
@@ -116,17 +117,18 @@ class Student(object):
 
         webhook = params["web-hook"]
 
-        text = """"""
+        text = """Here is your class participation summary ({}):\n""".format(self.student)
         for r in self.records:
-            text += "{}\n".format(r)
+            tmp = "{}".format(r)
+            tmp = tmp.replace("{}:".format(r.student), "")
+            text += "{}\n".format(tmp)
 
-        print(text)
-        # payload = {}
-        # payload["channel"] = "@{}".format(self.student)
-        # payload["text"] = text
-        # payload["link_names"] = 1
-        # cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
-        # so = run(cmd)
+        payload = {}
+        payload["channel"] = "@{}".format(self.student)
+        payload["text"] = text
+        payload["link_names"] = 1
+        cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
+        so = run(cmd)
 
 
 def main(student=None, remark=None, channel=None,
