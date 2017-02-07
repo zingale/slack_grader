@@ -49,6 +49,13 @@ To get a summary of points by student, do:
 ./slackgrade.py --report
 ```
 
+To DM each user a summary of their participation (only they will see
+their records), do
+```
+./slackgrade.py --post_grades
+```
+This will show up in their _slackbot_ channel.
+
 
 # todo
 
