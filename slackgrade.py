@@ -34,13 +34,18 @@ def run(string):
     return stdout0, stderr0, rc
 
 class Grade(object):
-    """ a new grade entry that we will be adding to slack and our records """
+    """ a new grade event that we will be adding to slack and our records """
 
     def __init__(self, student, remark=None, channel="#general"):
-        """ a Grade keeps track of a single entry in our grade records """
-        if student.startswith("@"):
-            student = student.split("@")[1]
-        self.student = student
+        """ a Grade keeps track of a single grading event in our grade records
+        note: we can have multiple students with a single remark """
+        self.student = []
+        for s in student:
+            if s.startswith("@"):
+                snew = s.split("@")[1]
+                self.student.append(snew)
+            else:
+                self.student.append(s)
 
         self.remark = remark
 
@@ -57,7 +62,12 @@ class Grade(object):
 
         payload = {}
         payload["channel"] = self.channel
-        payload["text"] = "<@{}> : {}".format(self.student, self.remark)
+
+        stext = ""
+        for s in self.student:
+            stext += "<@{}> ".format(s)
+
+        payload["text"] = "{} : {}".format(stext, self.remark)
         payload["link_names"] = 1
         cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
         so = run(cmd)
@@ -70,16 +80,20 @@ class Grade(object):
             lf.write("{}\n".format(self.__str__()))
 
     def __str__(self):
-        return "{}, {:20}, {:12}, {}".format(self.date, self.student, self.channel, self.remark)
+        sstring = ""
+        for s in self.student:
+            sstring += "{}, {:20}, {:12}, {}\n".format(self.date, s, self.channel, self.remark)
+        return sstring
+
 
 class Record(object):
     """ a recorded grade from our logs """
 
     def __init__(self, student, date, remark, channel):
-        self.student = student
-        self.date = date
-        self.remark = remark
-        self.channel = channel
+        self.student = student.strip()
+        self.date = date.strip()
+        self.remark = remark.strip()
+        self.channel = channel.strip()
 
     def __lt__(self, other):
         """ compare on student name for sorting """
@@ -186,7 +200,7 @@ def get_args():
     parser.add_argument("--class_name", type=str, help="name of class to grade",
                         default=None)
     parser.add_argument("student", type=str, nargs="?",
-                        help="name of student to grade",
+                        help="name of student to grade.  For multiple students, use space separate string",
                         default="")
     parser.add_argument("comment", type=str, nargs="?",
                         help="comment to use as grade", default="")
@@ -305,4 +319,6 @@ if __name__ == "__main__":
         main(post_grades=True)
 
     else:
-        main(args.student, args.comment, args.channel, class_name=args.class_name)
+        # we might have multiple students
+        students = args.student.split()
+        main(students, args.comment, args.channel, class_name=args.class_name)
