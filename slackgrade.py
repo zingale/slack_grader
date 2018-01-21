@@ -26,15 +26,19 @@ class SlackUser(object):
         self.im_channel = None
 
     def add_im(self, im_channel):
+        """add the direct message (IM) channel to this user's record"""
         self.im_channel = im_channel
 
     def post_str(self):
+        """return the string needed to reference this user in a message"""
         return r"<@{}>".format(self.slack_id)
 
     def __str__(self):
         return self.name
 
 def get_post_id_from_name(name, users):
+    """given a name, find the slack ID associated with it and return
+    the post string"""
     for u in users:
         if name in u.name:
             return u.post_str()
@@ -177,14 +181,12 @@ def get_users(params):
         slack_id = rec["id"]
         users.append(SlackUser(name, slack_id))
 
-    # now add the IM channel -- note: an IM channel will only exist if the 
-    # user has already interacted 
+    # now add the IM channel -- note: an IM channel will only exist if the
+    # user has already interacted
     # https://stackoverflow.com/questions/37598354/slack-dm-to-a-user-not-in-im-list
     im_info = sc.api_call(
         "im.list",
         limit=100)
-
-    print(im_info)
 
     for rec in im_info["ims"]:
         user_id = rec["user"]
@@ -209,9 +211,6 @@ def main(student=None, remark=None, channel=None,
     params = get_defaults(class_name)
 
     users = get_users(params)
-
-    for u in users:
-        print(u.name, u.slack_id, u.im_channel)
 
     # if we just want a summary, do it
     if just_summary:
@@ -381,20 +380,24 @@ def setup_params():
     with open(defaults_file, "w") as f:
         cf.write(f)
 
+def prelim():
+    """ parse the commandline and take action"""
 
-if __name__ == "__main__":
-    args = get_args()
+    cargs = get_args()
 
-    if args.setup:
+    if cargs.setup:
         setup_params()
 
-    elif args.report:
+    elif cargs.report:
         main(just_summary=True)
 
-    elif args.post_grades:
+    elif cargs.post_grades:
         main(post_grades=True)
 
     else:
         # we might have multiple students
-        students = args.student.split()
-        main(students, args.comment, args.channel, class_name=args.class_name)
+        students = cargs.student.split()
+        main(students, cargs.comment, cargs.channel, class_name=cargs.class_name)
+
+if __name__ == "__main__":
+    prelim()
