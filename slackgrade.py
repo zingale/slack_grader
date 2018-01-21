@@ -9,7 +9,6 @@ from __future__ import print_function
 
 import argparse
 import datetime
-import json
 import os
 import sys
 
@@ -24,6 +23,10 @@ class SlackUser(object):
     def __init__(self, name, slack_id):
         self.name = name
         self.slack_id = slack_id
+        self.im_channel = None
+
+    def add_im(self, im_channel):
+        self.im_channel = im_channel
 
     def post_str(self):
         return r"<@{}>".format(self.slack_id)
@@ -127,15 +130,19 @@ class Record(object):
 class Student(object):
     """ a collection of all the records for a particular student """
 
-    def __init__(self, student):
+    def __init__(self, student, users):
         self.student = student
         self.records = []
+
+        # get the user ID and IM channel from the user list
+        for u in users:
+            if self.student in u.name:
+                self.im_channel = u.im_channel
+                self.slack_id = u.slack_id
 
     def direct_message(self, params):
         """send a direct message to the student's slack DM channel
         summarizing the grades"""
-
-        webhook = params["web-hook"]
 
         text = """Here is your class participation summary ({}):\n""".format(self.student)
         for r in self.records:
@@ -143,27 +150,55 @@ class Student(object):
             tmp = tmp.replace("{}:".format(r.student), "")
             text += "{}\n".format(tmp)
 
-        payload = {}
-        payload["channel"] = "@{}".format(self.student)
-        payload["text"] = text
-        payload["link_names"] = 1
-        cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
-        so = run(cmd)
+        sc = SlackClient(params["token"])
 
+        sc.api_call(
+            "chat.postMessage",
+            channel=self.im_channel,
+            as_user=False,
+            username="grader",
+            icon_emoji=":farnsworth:",
+            text=text)
 
 def get_users(params):
 
+    # first get user Ids
     sc = SlackClient(params["token"])
 
     # note: we may run up against a limit here
     # eventually need to support pagination
-    user_info = sc.api_call("users.list")
+    user_info = sc.api_call(
+        "users.list",
+        limit=100)
 
     users = []
     for rec in user_info["members"]:
         name = rec["name"]
         slack_id = rec["id"]
         users.append(SlackUser(name, slack_id))
+
+    # now add the IM channel -- note: an IM channel will only exist if the 
+    # user has already interacted 
+    # https://stackoverflow.com/questions/37598354/slack-dm-to-a-user-not-in-im-list
+    im_info = sc.api_call(
+        "im.list",
+        limit=100)
+
+    print(im_info)
+
+    for rec in im_info["ims"]:
+        user_id = rec["user"]
+        im = rec["id"]
+
+        found = False
+        for u in users:
+            if u.slack_id == user_id:
+                u.add_im(im)
+                found = True
+                break
+
+        if not found:
+            sys.exit("Error: couldn't match id {} to user".format(user_id))
 
     return users
 
@@ -175,6 +210,9 @@ def main(student=None, remark=None, channel=None,
 
     users = get_users(params)
 
+    for u in users:
+        print(u.name, u.slack_id, u.im_channel)
+
     # if we just want a summary, do it
     if just_summary:
         report(params)
@@ -184,7 +222,7 @@ def main(student=None, remark=None, channel=None,
         names = set([q.student for q in records])
 
         for n in names:
-            student = Student(n)
+            student = Student(n, users)
             student.records = [q for q in records if q.student == n]
             student.direct_message(params)
 
