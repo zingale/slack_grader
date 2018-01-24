@@ -2,41 +2,51 @@
 
 """
 this is a simple grading tool for slack.  We post a simple
-"+1"-style grade for a student to a slack channel using an incoming
-webhook.
+"+1"-style grade for a student to a slack channel the slack API.
 """
 
 from __future__ import print_function
 
 import argparse
 import datetime
-import json
 import os
-import shlex
-import subprocess
 import sys
 
 import configparser
-import validators
 
-def run(string):
-    """ run a UNIX command """
+from slackclient import SlackClient
 
-    # shlex.split will preserve inner quotes
-    prog = shlex.split(string)
-    p0 = subprocess.Popen(prog, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT)
+class SlackUser(object):
+    """an object that holds the information about slack users, to allow
+    for mapping between user name and id"""
 
-    stdout0, stderr0 = p0.communicate()
-    rc = p0.returncode
-    p0.stdout.close()
+    def __init__(self, name, slack_id):
+        self.name = name
+        self.slack_id = slack_id
+        self.im_channel = None
 
-    return stdout0, stderr0, rc
+    def add_im(self, im_channel):
+        """add the direct message (IM) channel to this user's record"""
+        self.im_channel = im_channel
+
+    def post_str(self):
+        """return the string needed to reference this user in a message"""
+        return r"<@{}>".format(self.slack_id)
+
+    def __str__(self):
+        return self.name
+
+def get_post_id_from_name(name, users):
+    """given a name, find the slack ID associated with it and return
+    the post string"""
+    for u in users:
+        if name in u.name:
+            return u.post_str()
 
 class Grade(object):
     """ a new grade event that we will be adding to slack and our records """
 
-    def __init__(self, student, remark=None, channel="#general"):
+    def __init__(self, student, remark=None, channel="#general", users=None):
         """ a Grade keeps track of a single grading event in our grade records
         note: we can have multiple students with a single remark """
         self.student = []
@@ -46,6 +56,20 @@ class Grade(object):
                 self.student.append(snew)
             else:
                 self.student.append(s)
+
+        # translate the names to IDs
+        if users is not None:
+            sids = []
+            for s in self.student:
+                slack_id = get_post_id_from_name(s, users)
+                if slack_id is not None:
+                    sids.append(slack_id)
+                else:
+                    sys.exit("student {} does not exist".format(s))
+
+            self.sids = sids
+        else:
+            self.sids = [""]
 
         self.remark = remark
 
@@ -58,19 +82,22 @@ class Grade(object):
 
     def slack_post(self, params):
         """ post our grade to slack """
-        webhook = params["web-hook"]
 
-        payload = {}
-        payload["channel"] = self.channel
+        sc = SlackClient(params["token"])
 
         stext = ""
-        for s in self.student:
-            stext += "<@{}> ".format(s)
+        for s in self.sids:
+            stext += "{} ".format(s)
 
-        payload["text"] = "{} : {}".format(stext, self.remark)
-        payload["link_names"] = 1
-        cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
-        so = run(cmd)
+        message = "{} : {}".format(stext, self.remark)
+
+        sc.api_call(
+            "chat.postMessage",
+            channel=self.channel,
+            as_user=False,
+            username="grader",
+            icon_emoji=":farnsworth:",
+            text=message)
 
     def update_grades(self, params):
         """ update the grade log """
@@ -109,16 +136,20 @@ class Record(object):
 
 class Student(object):
     """ a collection of all the records for a particular student """
-    
-    def __init__(self, student):
+
+    def __init__(self, student, users):
         self.student = student
         self.records = []
+
+        # get the user ID and IM channel from the user list
+        for u in users:
+            if self.student in u.name:
+                self.im_channel = u.im_channel
+                self.slack_id = u.slack_id
 
     def direct_message(self, params):
         """send a direct message to the student's slack DM channel
         summarizing the grades"""
-
-        webhook = params["web-hook"]
 
         text = """Here is your class participation summary ({}):\n""".format(self.student)
         for r in self.records:
@@ -126,19 +157,63 @@ class Student(object):
             tmp = tmp.replace("{}:".format(r.student), "")
             text += "{}\n".format(tmp)
 
-        payload = {}
-        payload["channel"] = "@{}".format(self.student)
-        payload["text"] = text
-        payload["link_names"] = 1
-        cmd = "curl -X POST --data-urlencode 'payload={}' {}".format(json.dumps(payload), webhook)
-        so = run(cmd)
+        sc = SlackClient(params["token"])
 
+        sc.api_call(
+            "chat.postMessage",
+            channel=self.im_channel,
+            as_user=False,
+            username="grader",
+            icon_emoji=":farnsworth:",
+            text=text)
+
+def get_users(params):
+
+    # first get user Ids
+    sc = SlackClient(params["token"])
+
+    # note: we may run up against a limit here
+    # eventually need to support pagination
+    user_info = sc.api_call(
+        "users.list",
+        limit=100)
+
+    users = []
+    for rec in user_info["members"]:
+        name = rec["name"]
+        slack_id = rec["id"]
+        users.append(SlackUser(name, slack_id))
+
+    # now add the IM channel -- note: an IM channel will only exist if the
+    # user has already interacted
+    # https://stackoverflow.com/questions/37598354/slack-dm-to-a-user-not-in-im-list
+    im_info = sc.api_call(
+        "im.list",
+        limit=100)
+
+    for rec in im_info["ims"]:
+        user_id = rec["user"]
+        im = rec["id"]
+
+        found = False
+        for u in users:
+            if u.slack_id == user_id:
+                u.add_im(im)
+                found = True
+                break
+
+        if not found:
+            sys.exit("Error: couldn't match id {} to user".format(user_id))
+
+    return users
 
 def main(student=None, remark=None, channel=None,
          class_name=None, just_summary=False, post_grades=False):
     """ the main driver """
 
     params = get_defaults(class_name)
+
+    users = get_users(params)
 
     # if we just want a summary, do it
     if just_summary:
@@ -149,13 +224,13 @@ def main(student=None, remark=None, channel=None,
         names = set([q.student for q in records])
 
         for n in names:
-            student = Student(n)
+            student = Student(n, users)
             student.records = [q for q in records if q.student == n]
             student.direct_message(params)
 
     else:
         # create the grade object
-        g = Grade(student, remark=remark, channel=channel)
+        g = Grade(student, remark=remark, channel=channel, users=users)
 
         # post the +1 to slack
         g.slack_post(params)
@@ -238,8 +313,8 @@ def get_defaults(class_name):
         class_name = cf.sections()[0]
 
     defaults = {}
-    defaults["web-hook"] = cf.get(class_name, "web-hook")
     defaults["grade-log"] = cf.get(class_name, "grade-log")
+    defaults["token"] = cf.get(class_name, "token")
 
     return defaults
 
@@ -255,10 +330,8 @@ def setup_params():
     if class_name == "":
         sys.exit("Error: class name cannot be empty")
 
-    # ask for the slack api webhook
-    web_hook = input("Enter the full URL for your slack webhook: ")
-    if not validators.url(web_hook):
-        sys.exit("Error: slack webhook does not seem to be a valid URL")
+    # ask for the slack api token
+    token = input("Enter your slack token:: ")
 
     # ask for the path to the grade log
     home_path = os.getenv("HOME")
@@ -303,27 +376,31 @@ def setup_params():
     cf.add_section(class_name)
 
     # add the options
-    cf.set(class_name, "web-hook", web_hook)
+    cf.set(class_name, "token", token)
     cf.set(class_name, "grade-log", grade_log)
 
     # write it out
     with open(defaults_file, "w") as f:
         cf.write(f)
 
+def prelim():
+    """ parse the commandline and take action"""
 
-if __name__ == "__main__":
-    args = get_args()
+    cargs = get_args()
 
-    if args.setup:
+    if cargs.setup:
         setup_params()
 
-    elif args.report:
+    elif cargs.report:
         main(just_summary=True)
 
-    elif args.post_grades:
+    elif cargs.post_grades:
         main(post_grades=True)
 
     else:
         # we might have multiple students
-        students = args.student.split()
-        main(students, args.comment, args.channel, class_name=args.class_name)
+        students = cargs.student.split()
+        main(students, cargs.comment, cargs.channel, class_name=cargs.class_name)
+
+if __name__ == "__main__":
+    prelim()

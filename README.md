@@ -6,15 +6,12 @@ chat, keeping a log for each student  for end-of-semester grades.
 
 # setup
 
-* create an _incoming webhook_ for your slack.
+* install the `slackclient` package, e.g., as:
+  ```
+  pip3 install slackclient
+  ```
 
-  - go to https://_slackname_.slack.com/apps
-  - type "webhook" in the search box
-  - select "incoming webhooks" and follow the instuctions
-    (you can select an icon and label here)
-	
-  You should wind up with a URL that is the webhook you can post with
-
+* create an API token for your slack group.
 
 * configure:
 
@@ -22,8 +19,8 @@ chat, keeping a log for each student  for end-of-semester grades.
   ./slackgrade.py --setup
   ```
 
-  This will ask you some questions (including the URL for the webhook and
-  where to log the grades).
+  This will ask you some questions (including the API token and where
+  to log the grades).
 
   This will write a file in your home directory called `.slackgrader`
 
@@ -61,7 +58,7 @@ This will show up in their _slackbot_ channel.
 
 * add point values (so some comments can be worth more)
 
-* validate the users are actually on slack
+* better matching of name to slack ID (to ensure uniqueness)
 
 * better support for multiple classes (setting a default class)
 
