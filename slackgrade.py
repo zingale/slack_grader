@@ -76,8 +76,11 @@ class Grade(object):
         """ update the grade log """
         log_file = params["grade-log"]
 
-        with open(log_file, "a") as lf:
-            lf.write("{}\n".format(self.__str__()))
+        try:
+            with open(log_file, "a") as lf:
+                lf.write("{}\n".format(self.__str__()))
+        except FileNotFoundError:
+            print("ERROR: log file does not exist -- did you do --setup first?")
 
     def __str__(self):
         sstring = ""
