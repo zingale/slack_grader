@@ -60,6 +60,8 @@ This will show up in their _slackbot_ channel.
 
 * better matching of name to slack ID (to ensure uniqueness)
 
+* cache the user list (add a --refresh option to reload it?)
+
 * better support for multiple classes (setting a default class)
 
 * we don't handle the case where comments have a "," in the report
