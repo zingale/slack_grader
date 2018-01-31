@@ -36,12 +36,18 @@ class SlackUser(object):
     def __str__(self):
         return self.name
 
-def get_post_id_from_name(name, users):
+def get_student_from_name(name, users):
     """given a name, find the slack ID associated with it and return
     the post string"""
+    student = None
     for u in users:
         if name in u.name:
-            return u.post_str()
+            if student is None:
+                student = u
+            else:
+                sys.exit("Error: multiple users match {}".format(name))
+
+    return student
 
 class Grade(object):
     """ a new grade event that we will be adding to slack and our records """
@@ -49,27 +55,25 @@ class Grade(object):
     def __init__(self, student, remark=None, channel="#general", users=None):
         """ a Grade keeps track of a single grading event in our grade records
         note: we can have multiple students with a single remark """
-        self.student = []
+        _students = []
         for s in student:
             if s.startswith("@"):
                 snew = s.split("@")[1]
-                self.student.append(snew)
+                _students.append(snew)
             else:
-                self.student.append(s)
+                _students.append(s)
 
         # translate the names to IDs
         if users is not None:
-            sids = []
-            for s in self.student:
-                slack_id = get_post_id_from_name(s, users)
-                if slack_id is not None:
-                    sids.append(slack_id)
+            self.students = []
+            for s in _students:
+                student = get_student_from_name(s, users)
+                if student is not None:
+                    self.students.append(student)
                 else:
                     sys.exit("student {} does not exist".format(s))
-
-            self.sids = sids
         else:
-            self.sids = [""]
+            sys.exit("need the users")
 
         self.remark = remark
 
@@ -86,8 +90,8 @@ class Grade(object):
         sc = SlackClient(params["token"])
 
         stext = ""
-        for s in self.sids:
-            stext += "{} ".format(s)
+        for s in self.students:
+            stext += "{} ".format(s.post_str())
 
         message = "{} : {}".format(stext, self.remark)
 
@@ -111,8 +115,8 @@ class Grade(object):
 
     def __str__(self):
         sstring = ""
-        for s in self.student:
-            sstring += "{}, {:20}, {:12}, {}\n".format(self.date, s, self.channel, self.remark)
+        for s in self.students:
+            sstring += "{}, {:30}, {:12}, {}\n".format(self.date, s.name, self.channel, self.remark)
         return sstring
 
 
@@ -262,7 +266,7 @@ def report(params):
 
     for name in names:
         points = len([q for q in records if q.student == name])
-        print("{:20}, {}".format(name, points))
+        print("{:30}, {}".format(name, points))
 
 
 
