@@ -58,8 +58,6 @@ This will show up in their _slackbot_ channel.
 
 * add point values (so some comments can be worth more)
 
-* better matching of name to slack ID (to ensure uniqueness)
-
 * cache the user list (add a --refresh option to reload it?)
 
 * better support for multiple classes (setting a default class)
