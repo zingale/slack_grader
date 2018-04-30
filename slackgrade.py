@@ -212,7 +212,8 @@ def get_users(params):
     return users
 
 def main(student=None, remark=None, channel=None,
-         class_name=None, just_summary=False, post_grades=False):
+         class_name=None, just_summary=False, post_grades=False,
+         student_report=None):
     """ the main driver """
 
     params = get_defaults(class_name)
@@ -231,6 +232,26 @@ def main(student=None, remark=None, channel=None,
             student = Student(n, users)
             student.records = [q for q in records if q.student == n]
             student.direct_message(params)
+
+    elif student_report is not None:
+        records = get_records(params)
+        names = set([q.student for q in records])
+
+        student = None
+        for n in names:
+            if student_report.lower() in n:
+                student = n
+                break
+
+        if student is not None:
+            records = [q for q in records if q.student == student]
+            for r in records:
+                print(r)
+
+        else:
+            print("student not found")
+            print(names)
+            print("tianai" in names)
 
     else:
         # create the grade object
@@ -279,6 +300,8 @@ def get_args():
                         action="store_true")
     parser.add_argument("--report", help="write out a summary of points by student",
                         action="store_true")
+    parser.add_argument("--student_report", help="output the history of a single students activity",
+                        type=str, default=None)
     parser.add_argument("--post_grades", help="post grade summaries to the student's DM channel",
                         action="store_true")
     parser.add_argument("--class_name", type=str, help="name of class to grade",
@@ -293,7 +316,7 @@ def get_args():
                         default="#general")
     args = parser.parse_args()
 
-    if not args.setup and not (args.report or args.post_grades):
+    if not args.setup and not (args.report or args.post_grades or args.student_report):
         # in this case, we require the user name and comment
         if args.student == "" or args.comment == "":
             parser.print_help()
@@ -397,6 +420,9 @@ def prelim():
 
     elif cargs.report:
         main(just_summary=True)
+
+    elif cargs.student_report is not None:
+        main(student_report=cargs.student_report)
 
     elif cargs.post_grades:
         main(post_grades=True)
