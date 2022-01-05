@@ -13,7 +13,7 @@ import sys
 
 import configparser
 
-from slackclient import SlackClient
+import slack
 
 class SlackUser:
     """an object that holds the information about slack users, to allow
@@ -72,7 +72,7 @@ class Grade:
                 else:
                     sys.exit(f"student {s} does not exist")
         else:
-            sys.exit("need the users")
+            pass #sys.exit("need the users")
 
         self.remark = remark
 
@@ -86,7 +86,7 @@ class Grade:
     def slack_post(self, params):
         """ post our grade to slack """
 
-        sc = SlackClient(params["token"])
+        client = slack.WebClient(params["token"], timeout=30)
 
         stext = ""
         for s in self.students:
@@ -94,13 +94,10 @@ class Grade:
 
         message = f"{stext} : {self.remark}"
 
-        sc.api_call(
-            "chat.postMessage",
-            channel=self.channel,
-            as_user=False,
-            username="grader",
-            icon_emoji=":farnsworth:",
-            text=message)
+        client.chat_postMessage(channel=self.channel,
+                                username="grader",
+                                icon_emoji=":farnsworth:",
+                                text=message)
 
     def update_grades(self, params):
         """ update the grade log """
@@ -160,26 +157,21 @@ class Student:
             tmp = tmp.replace(f"{r.student}:", "")
             text += f"{tmp}\n"
 
-        sc = SlackClient(params["token"])
+        client = slack.WebClient(params["token"], timeout=30)
 
-        sc.api_call(
-            "chat.postMessage",
-            channel=self.im_channel,
-            as_user=False,
-            username="grader",
-            icon_emoji=":farnsworth:",
-            text=text)
+        client.chat.postMessage(channel=self.im_channel,
+                                username="grader",
+                                icon_emoji=":farnsworth:",
+                                text=text)
 
 def get_users(params):
 
     # first get user Ids
-    sc = SlackClient(params["token"])
+    client = slack.WebClient(params["token"], timeout=30)
 
     # note: we may run up against a limit here
     # eventually need to support pagination
-    user_info = sc.api_call(
-        "users.list",
-        limit=100)
+    user_info = client.api_call("users.list")
 
     users = []
     for rec in user_info["members"]:
@@ -187,26 +179,28 @@ def get_users(params):
         slack_id = rec["id"]
         users.append(SlackUser(name, slack_id))
 
+    # need to switch to conversations: https://api.slack.com/docs/conversations-api
+
     # now add the IM channel -- note: an IM channel will only exist if the
     # user has already interacted
     # https://stackoverflow.com/questions/37598354/slack-dm-to-a-user-not-in-im-list
-    im_info = sc.api_call(
-        "im.list",
-        limit=100)
+    # im_info = sc.api_call(
+    #     "im.list",
+    #     limit=100)
 
-    for rec in im_info["ims"]:
-        user_id = rec["user"]
-        im = rec["id"]
+    # for rec in im_info["ims"]:
+    #     user_id = rec["user"]
+    #     im = rec["id"]
 
-        found = False
-        for u in users:
-            if u.slack_id == user_id:
-                u.add_im(im)
-                found = True
-                break
+    #     found = False
+    #     for u in users:
+    #         if u.slack_id == user_id:
+    #             u.add_im(im)
+    #             found = True
+    #             break
 
-        if not found:
-            sys.exit(f"Error: couldn't match id {user_id} to user")
+    #     if not found:
+    #         sys.exit(f"Error: couldn't match id {user_id} to user")
 
     return users
 
@@ -218,6 +212,8 @@ def main(student=None, remark=None, channel=None,
     params = get_defaults(class_name)
 
     users = get_users(params)
+
+    print(users)
 
     # if we just want a summary, do it
     if just_summary:

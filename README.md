@@ -5,6 +5,12 @@
 A simple command-line tool for posting "+1" type grades to a slack
 chat, keeping a log for each student  for end-of-semester grades.
 
+# API token
+
+you need to create a slack API token.  You create an App that is a
+"bot" and then under "OAuth & Permissions" you give it access to your
+workspace.
+
 
 # setup
 
