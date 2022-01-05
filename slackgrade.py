@@ -5,7 +5,6 @@ this is a simple grading tool for slack.  We post a simple
 "+1"-style grade for a student to a slack channel the slack API.
 """
 
-from __future__ import print_function
 
 import argparse
 import datetime
@@ -16,7 +15,7 @@ import configparser
 
 from slackclient import SlackClient
 
-class SlackUser(object):
+class SlackUser:
     """an object that holds the information about slack users, to allow
     for mapping between user name and id"""
 
@@ -31,7 +30,7 @@ class SlackUser(object):
 
     def post_str(self):
         """return the string needed to reference this user in a message"""
-        return r"<@{}>".format(self.slack_id)
+        return fr"<@{self.slack_id}>"
 
     def __str__(self):
         return self.name
@@ -45,11 +44,11 @@ def get_student_from_name(name, users):
             if student is None:
                 student = u
             else:
-                sys.exit("Error: multiple users match {}".format(name))
+                sys.exit(f"Error: multiple users match {name}")
 
     return student
 
-class Grade(object):
+class Grade:
     """ a new grade event that we will be adding to slack and our records """
 
     def __init__(self, student, remark=None, channel="#general", users=None):
@@ -71,7 +70,7 @@ class Grade(object):
                 if student is not None:
                     self.students.append(student)
                 else:
-                    sys.exit("student {} does not exist".format(s))
+                    sys.exit(f"student {s} does not exist")
         else:
             sys.exit("need the users")
 
@@ -91,9 +90,9 @@ class Grade(object):
 
         stext = ""
         for s in self.students:
-            stext += "{} ".format(s.post_str())
+            stext += f"{s.post_str()} "
 
-        message = "{} : {}".format(stext, self.remark)
+        message = f"{stext} : {self.remark}"
 
         sc.api_call(
             "chat.postMessage",
@@ -109,18 +108,18 @@ class Grade(object):
 
         try:
             with open(log_file, "a") as lf:
-                lf.write("{}\n".format(self.__str__()))
+                lf.write(f"{self.__str__()}\n")
         except FileNotFoundError:
             print("ERROR: log file does not exist -- did you do --setup first?")
 
     def __str__(self):
         sstring = ""
         for s in self.students:
-            sstring += "{}, {:30}, {:12}, {}\n".format(self.date, s.name, self.channel, self.remark)
+            sstring += f"{self.date}, {s.name:30}, {self.channel:12}, {self.remark}\n"
         return sstring
 
 
-class Record(object):
+class Record:
     """ a recorded grade from our logs """
 
     def __init__(self, student, date, remark, channel):
@@ -134,11 +133,11 @@ class Record(object):
         return self.student < other.student
 
     def __str__(self):
-        rstr = "{}: ({}; {}) {}".format(self.student, self.date, self.channel, self.remark)
+        rstr = f"{self.student}: ({self.date}; {self.channel}) {self.remark}"
         return rstr
 
 
-class Student(object):
+class Student:
     """ a collection of all the records for a particular student """
 
     def __init__(self, student, users):
@@ -155,11 +154,11 @@ class Student(object):
         """send a direct message to the student's slack DM channel
         summarizing the grades"""
 
-        text = """Here is your class participation summary ({}):\n""".format(self.student)
+        text = f"""Here is your class participation summary ({self.student}):\n"""
         for r in self.records:
-            tmp = "{}".format(r)
-            tmp = tmp.replace("{}:".format(r.student), "")
-            text += "{}\n".format(tmp)
+            tmp = f"{r}"
+            tmp = tmp.replace(f"{r.student}:", "")
+            text += f"{tmp}\n"
 
         sc = SlackClient(params["token"])
 
@@ -207,7 +206,7 @@ def get_users(params):
                 break
 
         if not found:
-            sys.exit("Error: couldn't match id {} to user".format(user_id))
+            sys.exit(f"Error: couldn't match id {user_id} to user")
 
     return users
 
@@ -226,7 +225,7 @@ def main(student=None, remark=None, channel=None,
 
     elif post_grades:
         records = get_records(params)
-        names = set([q.student for q in records])
+        names = {q.student for q in records}
 
         for n in names:
             student = Student(n, users)
@@ -235,7 +234,7 @@ def main(student=None, remark=None, channel=None,
 
     elif student_report is not None:
         records = get_records(params)
-        names = set([q.student for q in records])
+        names = {q.student for q in records}
 
         student = None
         for n in names:
@@ -283,11 +282,11 @@ def report(params):
     records = get_records(params)
 
     # find unique student names
-    names = sorted(set([q.student for q in records]))
+    names = sorted({q.student for q in records})
 
     for name in names:
         points = len([q for q in records if q.student == name])
-        print("{:30}, {}".format(name, points))
+        print(f"{name:30}, {points}")
 
 
 
@@ -347,7 +346,7 @@ def get_defaults(class_name):
 
 def log_name(log_path, class_name):
     """ return the name of the log file we'll use """
-    return os.path.join(log_path, "{}-slackgrades.log".format(class_name.strip()))
+    return os.path.join(log_path, f"{class_name.strip()}-slackgrades.log")
 
 def setup_params():
     """ query the user to get the default parameters for this grade session """
@@ -363,7 +362,7 @@ def setup_params():
     # ask for the path to the grade log
     home_path = os.getenv("HOME")
 
-    log_path = input("Enter the full path to the grade log [{}]: ".format(home_path))
+    log_path = input(f"Enter the full path to the grade log [{home_path}]: ")
     if log_path == "":
         log_path = home_path
 
@@ -372,15 +371,15 @@ def setup_params():
     if os.path.isfile(grade_log):
         # if it exists, say we'll append.
         print("Grade log already exists.  We'll append")
-        print("using logfile: {}".format(grade_log))
+        print(f"using logfile: {grade_log}")
     else:
         # create a stub
         try:
             lf = open(grade_log, "w")
-        except IOError:
+        except OSError:
             sys.exit("Error: unable to create the log file")
         else:
-            lf.write("# slack grade log log for class: {}\n".format(class_name))
+            lf.write(f"# slack grade log log for class: {class_name}\n")
             lf.close()
 
     # write defaults file -- it's an ini-style file
