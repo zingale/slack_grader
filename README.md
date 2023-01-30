@@ -11,6 +11,19 @@ you need to create a slack API token.  You create an App that is a
 "bot" and then under "OAuth & Permissions" you give it access to your
 workspace.
 
+* Start at: https://api.slack.com/apps
+
+* Do "Create New App" and select "From Scratch"
+
+* Call the App "slackgrader" and select for it to be in the workspace for your class
+
+* In the "OAuth & Permissions" tab, add the token scopes: "chat:write", "users:read"
+
+* On the same page, do "install to workspace" and copy the OAuth Token
+
+* In your workspace, you'll need to add this bot to the channels you
+  want it to post it, you can do this just by typing `@slackgrader` in
+  that channel
 
 # setup
 

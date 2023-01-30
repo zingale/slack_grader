@@ -95,7 +95,7 @@ class Grade:
         message = f"{stext} : {self.remark}"
 
         client.chat_postMessage(channel=self.channel,
-                                username="grader",
+                                username="slackgrader",
                                 icon_emoji=":farnsworth:",
                                 text=message)
 
@@ -212,8 +212,8 @@ def main(student=None, remark=None, channel=None,
     params = get_defaults(class_name)
 
     users = get_users(params)
-
-    print(users)
+    for u in users:
+        print(u)
 
     # if we just want a summary, do it
     if just_summary:
