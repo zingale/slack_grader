@@ -17,9 +17,11 @@ workspace.
 
 * Call the App "slackgrader" and select for it to be in the workspace for your class
 
-* In the "OAuth & Permissions" tab, add the token scopes: "chat:write", "users:read"
+* In the "OAuth & Permissions" tab, add the *bot token scopes*: "chat:write", "users:read"
 
 * On the same page, do "install to workspace" and copy the OAuth Token
+
+  You can confirm on the "OAuth & Permissions" page that you are using the *Bot User OAuth Token*
 
 * In your workspace, you'll need to add this bot to the channels you
   want it to post it, you can do this just by typing `@slackgrader` in
